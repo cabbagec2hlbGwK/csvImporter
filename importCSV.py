@@ -24,6 +24,9 @@ def otherType(data, df, head):
 def typeGess(df) -> dict():
     typeMapping = {}
     for head, type in df.dtypes.items():
+        if head == "index" or head == "Index":
+            print("change the colum name from Index to something else")
+            exit()
         size = df[head].astype(str).str.len().max()
         dataType = None
         if type == pandas.Int64Dtype.type:
@@ -100,18 +103,18 @@ def task(df, tableN, mapper, conString):
 def main():
     # Change the value
     sep = ","
-    csvFile = "fashon.csv"  # name of the csv file
+    csvFile = "appleRe.csv"  # name of the csv file
     tableN = csvFile.split('.')[0]
     # replace this with your connection string
     conString = os.getenv("SQLCONN")
-    threads = 40
+    threads = 61
 
     df = pandas.read_csv(csvFile, sep=sep)
     mapper = typeGess(df)
     # print(df)
 
     tableQuery = createQuery(mapper, tableN)
-    print(tableQuery)
+    # print(tableQuery)
 
     print(len(df))
     # well herer we create the connection
@@ -131,8 +134,15 @@ def main():
         for j in job:
             j.start()
     except Exception as e:
-        print("\n\n\nJust check the connection string")
-        print(e)
+        if "42000" in str(e):
+            print("Change the name of the column from index to something else")
+        elif "42S01" in str(e):
+            print(
+                "The table alredy exist and u tried to create it again")
+        else:
+            print("---------------------")
+            print(type(e))
+            print("\n\n\nJust check the connection string")
 
 
 if __name__ == "__main__":
