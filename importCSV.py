@@ -24,9 +24,9 @@ def otherType(data, df, head):
 def typeGess(df) -> dict():
     typeMapping = {}
     for head, type in df.dtypes.items():
-        if head == "index" or head == "Index":
-            print("change the colum name from Index to something else")
-            exit()
+        # if head == "index" or head == "Index":
+        #     print("change the colum name from Index to something else")
+        #     exit()
         size = df[head].astype(str).str.len().max()
         dataType = None
         if type == pandas.Int64Dtype.type:
@@ -65,7 +65,7 @@ def createQuery(mapper, table):
         if i != size-1:
             createQuery += " ,"
     createQuery += " );"
-    return createQuery
+    return createQuery.replace("+", "_")
 
 
 def insertData(df, tableName, mapper, cur=None):
@@ -84,7 +84,7 @@ def insertData(df, tableName, mapper, cur=None):
                 cleanV = str(row[head]).replace("'", "").replace(
                     "/", "").replace("\\", "")
                 values += f"'{cleanV}' ,"
-        v = f"INSERT INTO {tableName} ({colums.replace(' ','_').replace('/','')}) VALUES ({values[:-1]}) ;"
+        v = f"INSERT INTO {tableName} ({colums.replace(' ','_').replace('/','').replace('+','_')}) VALUES ({values[:-1]}) ;"
         # print(v)
         cur.execute(v)
     print("done")
@@ -103,11 +103,11 @@ def task(df, tableN, mapper, conString):
 def main():
     # Change the value
     sep = ","
-    csvFile = "appleRe.csv"  # name of the csv file
+    csvFile = "TelewireAnalytics.csv"  # name of the csv file
     tableN = csvFile.split('.')[0]
     # replace this with your connection string
     conString = os.getenv("SQLCONN")
-    threads = 61
+    threads = 1
 
     df = pandas.read_csv(csvFile, sep=sep)
     mapper = typeGess(df)
@@ -121,6 +121,7 @@ def main():
     try:
         con = odb.connect(conString)
         cursor = con.cursor()
+        # print(tableQuery)
         cursor.execute(tableQuery)
         cursor.commit()
         cursor.close()
@@ -135,6 +136,7 @@ def main():
             j.start()
     except Exception as e:
         if "42000" in str(e):
+            print(e)
             print("Change the name of the column from index to something else")
         elif "42S01" in str(e):
             print(
