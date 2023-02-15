@@ -98,9 +98,11 @@ def task(df, tableN, mapper, conString):
 
 
 def main():
+    # Change the value
     sep = ","
-    csvFile = "fashon.csv"
+    csvFile = "fashon.csv"  # name of the csv file
     tableN = csvFile.split('.')[0]
+    # replace this with your connection string
     conString = os.getenv("SQLCONN")
     threads = 40
 
