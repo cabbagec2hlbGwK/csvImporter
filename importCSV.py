@@ -1,6 +1,8 @@
 import os
 import re
 import pandas
+import threading
+import numpy as np
 import pyodbc as odb
 
 
@@ -22,11 +24,18 @@ def otherType(data, df, head):
 def typeGess(df) -> dict():
     typeMapping = {}
     for head, type in df.dtypes.items():
+        size = df[head].astype(str).str.len().max()
         dataType = None
         if type == pandas.Int64Dtype.type:
-            dataType = "INT"
+            if size > 7:
+                dataType = f"VARCHAR({size})"
+            else:
+                dataType = "INT"
         elif type == pandas.Float64Dtype.type:
-            dataType = "FLOAT"
+            if size > 7:
+                dataType = f"VARCHAR({size})"
+            else:
+                dataType = "FLOAT"
         elif type == "bool":
             dataType = "BIT"
         else:
@@ -60,6 +69,7 @@ def insertData(df, tableName, mapper, cur=None):
     head = df.columns
     colums = ",".join(head)
     for index, row in df.iterrows():
+        # print(str(index)+" DONE")
         values = ""
         for head in colums.split(','):
             if "INT" in mapper[head] or "FLOAT" in mapper[head]:
@@ -71,34 +81,56 @@ def insertData(df, tableName, mapper, cur=None):
                 cleanV = str(row[head]).replace("'", "").replace(
                     "/", "").replace("\\", "")
                 values += f"'{cleanV}' ,"
-        v = f"INSERT INTO {tableName} ({colums.replace(' ','_')}) VALUES ({values[:-1]}) ;"
+        v = f"INSERT INTO {tableName} ({colums.replace(' ','_').replace('/','')}) VALUES ({values[:-1]}) ;"
+        # print(v)
         cur.execute(v)
     print("done")
 
 
-def main():
-    sep = ","
-    csvFile = "shark1.csv"
-    tableN = "shark"
-    conString = os.getenv("SQLCONN")
-
-    df = pandas.read_csv(csvFile, sep=sep)
-    mapper = typeGess(df)
-    tableQuery = createQuery(mapper, tableN)
-
-    print(len(df))
-    # well herer we create the connection
-    # try:
+def task(df, tableN, mapper, conString):
+    print("job started")
     con = odb.connect(conString)
     cursor = con.cursor()
-    cursor.execute(tableQuery)
-    cursor.commit()
     insertData(df, tableN, mapper, cursor)
     cursor.commit()
     cursor.close()
-    # except Exception as e:
-    # print("\n\n\nJust check the connection string")
-    # print(e)
+    print("job Done")
+
+
+def main():
+    sep = ","
+    csvFile = "fashon.csv"
+    tableN = csvFile.split('.')[0]
+    conString = os.getenv("SQLCONN")
+    threads = 40
+
+    df = pandas.read_csv(csvFile, sep=sep)
+    mapper = typeGess(df)
+    # print(df)
+
+    tableQuery = createQuery(mapper, tableN)
+    print(tableQuery)
+
+    print(len(df))
+    # well herer we create the connection
+    try:
+        con = odb.connect(conString)
+        cursor = con.cursor()
+        cursor.execute(tableQuery)
+        cursor.commit()
+        cursor.close()
+        parts = np.array_split(df, threads)
+        job = []
+        for part in parts:
+            frame = pandas.DataFrame(
+                part, columns=df.columns).reset_index(drop=True)
+            job.append(threading.Thread(target=task, args=(
+                frame, tableN, mapper, conString)))
+        for j in job:
+            j.start()
+    except Exception as e:
+        print("\n\n\nJust check the connection string")
+        print(e)
 
 
 if __name__ == "__main__":
